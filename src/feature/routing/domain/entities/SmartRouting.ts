@@ -30,8 +30,6 @@ export interface RoutingTargetPayload {
 
 export interface RoutingPayload {
   display_name: string;
-  provider: string;
-  model_name: string;
   routing: {
     strategy: Exclude<RoutingStrategy, 'round_robin'>;
     targets: RoutingTargetPayload[];
@@ -85,15 +83,12 @@ export function buildRoutingTargetsPayload(args: {
   displayName: string;
   strategy: string;
   targets: RoutingFormTarget[];
-  provider?: string;
 }): RoutingPayload {
-  const { displayName, strategy, targets, provider = 'virtual' } = args;
+  const { displayName, strategy, targets } = args;
   const normalized = strategy === 'round_robin' ? 'round_robin_weighted' : strategy;
 
   return {
     display_name: displayName.trim(),
-    provider,
-    model_name: displayName.trim(),
     routing: {
       strategy: normalized as Exclude<RoutingStrategy, 'round_robin'>,
       targets: targets.map((t) => ({

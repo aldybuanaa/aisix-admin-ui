@@ -25,14 +25,17 @@ export interface HealthStatus {
   config: HealthConfig;
 }
 
+export type ModelRuntimeStatus = 'healthy' | 'unhealthy' | 'cooldown' | 'not_applicable' | 'unknown';
+
 export interface ModelStatusEntry {
   id: string;
   display_name: string;
   kind: 'direct' | 'routing' | 'ensemble' | 'semantic';
-  status: 'active' | 'error' | 'rate_limited' | 'not_applicable' | 'unknown';
-  consecutive_failures: number;
-  last_failure: number | null;
-  last_success: number | null;
+  status: ModelRuntimeStatus;
+  cooldown_until: number | null;
+  last_checked_at: number | null;
+  last_check_status: number | null;
+  status_reason: string | null;
 }
 
 export interface ProviderBreakdown {

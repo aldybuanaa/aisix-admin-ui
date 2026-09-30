@@ -11,6 +11,7 @@ import { parsePrometheusText } from '../../../../domain/utils/parsePrometheusTex
 import type {
   HealthStatus,
   MetricsSummary,
+  ModelRuntimeStatus,
   ModelStatusEntry,
 } from '../../../../domain/entities/MetricsEntity';
 
@@ -22,20 +23,46 @@ interface HealthResponseDto {
   config?: unknown;
 }
 
-// GET /admin/v1/models/status returns an array of model entries in snake_case.
+// SystemTime from Rust/Serde serializes as:
+//   { secs_since_epoch: number, nanos_since_epoch: number }
+interface SystemTimeDto {
+  secs_since_epoch?: unknown;
+  nanos_since_epoch?: unknown;
+}
+
+// GET /admin/v1/models/status returns an array of ModelStatusView (flattened RuntimeStatusSnapshot).
 interface ModelStatusDto {
   id?: unknown;
   display_name?: unknown;
   kind?: unknown;
   status?: unknown;
-  consecutive_failures?: unknown;
-  last_failure?: unknown;
-  last_success?: unknown;
+  cooldown_until?: unknown;
+  last_checked_at?: unknown;
+  last_check_status?: unknown;
+  status_reason?: unknown;
 }
 
 const VALID_HEALTH_STATUSES = ['ok', 'degraded', 'unhealthy'] as const;
 const VALID_MODEL_KINDS = ['direct', 'routing', 'ensemble', 'semantic'] as const;
-const VALID_MODEL_STATUSES = ['active', 'error', 'rate_limited', 'not_applicable', 'unknown'] as const;
+const VALID_RUNTIME_STATUSES: readonly ModelRuntimeStatus[] = [
+  'healthy',
+  'unhealthy',
+  'cooldown',
+  'not_applicable',
+] as const;
+
+function parseSystemTime(val: unknown): number | null {
+  if (typeof val === 'number') {
+    return Number.isFinite(val) ? val : null;
+  }
+  if (val !== null && typeof val === 'object') {
+    const rec = val as SystemTimeDto;
+    if (typeof rec.secs_since_epoch === 'number' && Number.isFinite(rec.secs_since_epoch)) {
+      return rec.secs_since_epoch;
+    }
+  }
+  return null;
+}
 
 function mapHealth(body: HealthResponseDto): HealthStatus {
   const status = VALID_HEALTH_STATUSES.includes(body.status as (typeof VALID_HEALTH_STATUSES)[number])
@@ -74,17 +101,22 @@ function mapModelStatus(dto: ModelStatusDto): ModelStatusEntry {
   const kind = VALID_MODEL_KINDS.includes(dto.kind as (typeof VALID_MODEL_KINDS)[number])
     ? (dto.kind as ModelStatusEntry['kind'])
     : 'direct';
-  const status = VALID_MODEL_STATUSES.includes(dto.status as (typeof VALID_MODEL_STATUSES)[number])
-    ? (dto.status as ModelStatusEntry['status'])
-    : 'unknown';
+
+  const rawStatus = dto.status as string | undefined;
+  const status: ModelRuntimeStatus =
+    rawStatus && VALID_RUNTIME_STATUSES.includes(rawStatus as ModelRuntimeStatus)
+      ? (rawStatus as ModelRuntimeStatus)
+      : 'unknown';
+
   return {
     id: typeof dto.id === 'string' ? dto.id : '',
     display_name: typeof dto.display_name === 'string' ? dto.display_name : '',
     kind,
     status,
-    consecutive_failures: typeof dto.consecutive_failures === 'number' ? dto.consecutive_failures : 0,
-    last_failure: typeof dto.last_failure === 'number' ? dto.last_failure : null,
-    last_success: typeof dto.last_success === 'number' ? dto.last_success : null,
+    cooldown_until: parseSystemTime(dto.cooldown_until),
+    last_checked_at: parseSystemTime(dto.last_checked_at),
+    last_check_status: typeof dto.last_check_status === 'number' ? dto.last_check_status : null,
+    status_reason: typeof dto.status_reason === 'string' ? dto.status_reason : null,
   };
 }
 

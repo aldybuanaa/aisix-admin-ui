@@ -115,10 +115,21 @@ function makeTextHttpClient(prometheusText: string): HttpClient {
               id: 'uuid-1',
               display_name: 'gpt-4o',
               kind: 'direct',
-              status: 'active',
-              consecutive_failures: 0,
-              last_failure: null,
-              last_success: 1720000000,
+              status: 'healthy',
+              cooldown_until: null,
+              last_checked_at: { secs_since_epoch: 1720000000, nanos_since_epoch: 123000000 },
+              last_check_status: 200,
+              status_reason: null,
+            },
+            {
+              id: 'uuid-2',
+              display_name: 'claude-3-5',
+              kind: 'routing',
+              status: 'not_applicable',
+              cooldown_until: null,
+              last_checked_at: null,
+              last_check_status: null,
+              status_reason: null,
             },
           ],
           headers: new Headers(),
@@ -174,19 +185,20 @@ describe('MetricsRemoteDataSourceImpl', () => {
   });
 
   describe('getModelStatuses()', () => {
-    it('maps a model status array from the backend', async () => {
+    it('maps a model status array matching real ModelStatusView payload', async () => {
       const ds = new MetricsRemoteDataSourceImpl(makeTextHttpClient(''));
       const result = await lastValueFrom(ds.getModelStatuses());
       expect(result.type).toBe('Success');
       if (result.type === 'Success') {
-        expect(result.data).toHaveLength(1);
+        expect(result.data).toHaveLength(2);
         const entry = result.data[0];
         expect(entry.id).toBe('uuid-1');
         expect(entry.display_name).toBe('gpt-4o');
         expect(entry.kind).toBe('direct');
-        expect(entry.status).toBe('active');
-        expect(entry.consecutive_failures).toBe(0);
-        expect(entry.last_success).toBe(1720000000);
+        expect(entry.status).toBe('healthy');
+        expect(entry.last_checked_at).toBe(1720000000);
+        expect(entry.last_check_status).toBe(200);
+        expect(entry.status_reason).toBeNull();
       }
     });
 
@@ -245,19 +257,21 @@ function makeVm() {
       id: 'uuid-1',
       display_name: 'gpt-4o',
       kind: 'direct',
-      status: 'active',
-      consecutive_failures: 0,
-      last_failure: null,
-      last_success: 1720000000,
+      status: 'healthy',
+      cooldown_until: null,
+      last_checked_at: 1720000000,
+      last_check_status: 200,
+      status_reason: null,
     },
     {
       id: 'uuid-2',
       display_name: 'claude-3-5',
       kind: 'routing',
-      status: 'rate_limited',
-      consecutive_failures: 3,
-      last_failure: 1720000100,
-      last_success: 1720000050,
+      status: 'not_applicable',
+      cooldown_until: null,
+      last_checked_at: null,
+      last_check_status: null,
+      status_reason: null,
     },
   ];
   const mockMetrics: MetricsSummary = {
@@ -318,8 +332,7 @@ describe('MetricsDashboardViewModel', () => {
     if (vm.uiState.modelStatusState.type === 'Success') {
       expect(vm.uiState.modelStatusState.data).toHaveLength(mockModels.length);
       expect(vm.uiState.modelStatusState.data[0].id).toBe('uuid-1');
-      expect(vm.uiState.modelStatusState.data[1].status).toBe('rate_limited');
-      expect(vm.uiState.modelStatusState.data[1].consecutive_failures).toBe(3);
+      expect(vm.uiState.modelStatusState.data[1].status).toBe('not_applicable');
     }
     vm.dispose();
   });

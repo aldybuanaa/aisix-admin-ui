@@ -52,13 +52,12 @@ describe('buildRoutingTargetsPayload — backend resource body', () => {
       displayName: 'balanced',
       strategy: 'round_robin_weighted',
       targets: [target('models:gpt-4o', 3, 1), target('models:gpt-4o-mini', 1, 2)],
-      provider: 'virtual',
     });
     expect(payload).toMatchObject({
       display_name: 'balanced',
-      provider: 'virtual',
-      model_name: 'balanced',
     });
+    expect(payload).not.toHaveProperty('provider');
+    expect(payload).not.toHaveProperty('model_name');
     const routing = payload.routing as any;
     expect(routing.strategy).toBe('round_robin_weighted');
     expect(routing.targets).toHaveLength(2);

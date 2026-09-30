@@ -133,7 +133,6 @@ describe('SmartRoutingViewModel', () => {
       'models',
       expect.objectContaining({
         display_name: 'Smart Tier',
-        provider: 'virtual',
         routing: expect.objectContaining({
           strategy: 'round_robin_weighted',
           targets: [

@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, computed } from 'vue';
 import { coreContainer } from '@/core/di/di';
 import { MetricsModuleKeys } from '../../di/MetricsModuleKeys';
 import type { MetricsDashboardViewModel } from '../viewmodel/MetricsDashboardViewModel';
-import type { ModelStatusEntry } from '../../domain/entities/MetricsEntity';
+import type { ModelRuntimeStatus } from '../../domain/entities/MetricsEntity';
 
 const vm = coreContainer.get<MetricsDashboardViewModel>(MetricsModuleKeys.MetricsDashboardViewModel);
 
@@ -50,13 +50,18 @@ function modelHealthBadgeClass(health: 0 | 1 | 2): string {
   return 'badge-red';
 }
 
-function statusBadgeClass(status: ModelStatusEntry['status']) {
+function statusBadgeClass(status: ModelRuntimeStatus) {
   switch (status) {
-    case 'active': return 'badge-emerald';
-    case 'error': return 'badge-red';
-    case 'rate_limited': return 'badge-amber';
-    case 'not_applicable': return 'badge';
-    default: return 'badge';
+    case 'healthy':
+      return 'badge-emerald';
+    case 'unhealthy':
+      return 'badge-red';
+    case 'cooldown':
+      return 'badge-amber';
+    case 'not_applicable':
+      return 'badge';
+    default:
+      return 'badge';
   }
 }
 
@@ -182,7 +187,7 @@ function fmtTimestamp(ts: number | null): string {
 
     <!-- Model Statuses (from /admin/v1/models/status) -->
     <div class="panel p-4 space-y-3">
-      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Model Status</h3>
+      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Model Runtime Status</h3>
 
       <div v-if="modelStatus.type === 'Loading'" class="py-6 text-center text-sm text-slate-500 animate-pulse">
         Loading model statuses…
@@ -197,7 +202,7 @@ function fmtTimestamp(ts: number | null): string {
       </div>
 
       <div
-        v-else-if="modelStatus.type === 'Success' && modelStatus.data.length === 0"
+        v-else-if="modelStatus.type === 'Success' && modelStatus.data.length === 0"\
         class="py-6 text-sm text-center text-slate-400 dark:text-slate-500"
       >
         No models found. Configure models in the Provider Wizard.
@@ -210,8 +215,8 @@ function fmtTimestamp(ts: number | null): string {
               <th class="pb-2 font-semibold">Model</th>
               <th class="pb-2 font-semibold hidden sm:table-cell">Kind</th>
               <th class="pb-2 font-semibold">Status</th>
-              <th class="pb-2 font-semibold hidden md:table-cell text-right">Failures</th>
-              <th class="pb-2 font-semibold hidden lg:table-cell">Last Success</th>
+              <th class="pb-2 font-semibold hidden md:table-cell">Reason / Cooldown</th>
+              <th class="pb-2 font-semibold hidden lg:table-cell">Last Checked</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -228,13 +233,14 @@ function fmtTimestamp(ts: number | null): string {
               <td class="py-2.5 pr-3">
                 <span :class="['badge', statusBadgeClass(m.status)]">{{ m.status }}</span>
               </td>
-              <td class="py-2.5 pr-3 hidden md:table-cell text-right text-xs tabular-nums"
-                :class="m.consecutive_failures > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'"
-              >
-                {{ m.consecutive_failures }}
+              <td class="py-2.5 pr-3 hidden md:table-cell text-xs text-slate-600 dark:text-slate-400">
+                <span v-if="m.status_reason">{{ m.status_reason }}</span>
+                <span v-else-if="m.cooldown_until" class="text-amber-600">Until {{ fmtTimestamp(m.cooldown_until) }}</span>
+                <span v-else class="text-slate-400">—</span>
               </td>
               <td class="py-2.5 hidden lg:table-cell text-xs text-slate-400 font-mono">
-                {{ fmtTimestamp(m.last_success) }}
+                <span v-if="m.last_checked_at">{{ fmtTimestamp(m.last_checked_at) }} (HTTP {{ m.last_check_status ?? '—' }})</span>
+                <span v-else>—</span>
               </td>
             </tr>
           </tbody>
