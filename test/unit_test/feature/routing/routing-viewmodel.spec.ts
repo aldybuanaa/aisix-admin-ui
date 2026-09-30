@@ -134,7 +134,7 @@ describe('SmartRoutingViewModel', () => {
       expect.objectContaining({
         display_name: 'Smart Tier',
         routing: expect.objectContaining({
-          strategy: 'round_robin_weighted',
+          strategy: 'round_robin',
           targets: [
             { model: 'models:gpt-4o', weight: 2, priority: 0 },
             { model: 'models:claude-3-5', weight: 1, priority: 0 },

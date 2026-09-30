@@ -59,17 +59,18 @@ describe('buildRoutingTargetsPayload — backend resource body', () => {
     expect(payload).not.toHaveProperty('provider');
     expect(payload).not.toHaveProperty('model_name');
     const routing = payload.routing as any;
-    expect(routing.strategy).toBe('round_robin_weighted');
+    expect(routing.strategy).toBe('round_robin');
     expect(routing.targets).toHaveLength(2);
     expect(routing.targets[0]).toEqual({ model: 'models:gpt-4o', weight: 3, priority: 1 });
+    expect(routing.targets[1]).toEqual({ model: 'models:gpt-4o-mini', weight: 1, priority: 2 });
   });
 
-  it('maps round_robin to round_robin_weighted', () => {
+  it('maps round_robin to round_robin wire value', () => {
     const payload = buildRoutingTargetsPayload({
       displayName: 'rr',
       strategy: 'round_robin',
       targets: [target('a'), target('b')],
     });
-    expect((payload.routing as any).strategy).toBe('round_robin_weighted');
+    expect((payload.routing as any).strategy).toBe('round_robin');
   });
 });
