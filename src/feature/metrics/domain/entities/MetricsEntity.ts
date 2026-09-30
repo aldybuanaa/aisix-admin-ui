@@ -1,40 +1,50 @@
-// -------------------------------------------------------
-// Metrics data layer — typed contracts for backend endpoints
+// Metrics domain entities — shaped to match real backend contracts.
 //
-// Candidate endpoints (Bima to confirm):
-//   GET /admin/v1/health       → HealthStatus
-//   GET /livez                 → text "ok"
-//   GET /admin/v1/models/status → ModelStatusMap
-//   GET /admin/v1/metrics/summary → MetricsSummary
-// -------------------------------------------------------
+// Endpoints:
+//   GET /admin/v1/health          → HealthStatus
+//   GET /admin/v1/models/status   → ModelStatusEntry[]
+//   GET /admin/v1/metrics         → Prometheus text → MetricsSummary (via parser)
 
-export type HealthState = 'ok' | 'degraded' | 'error' | 'unknown';
+/** Numeric health code returned inside the health endpoint's models array. */
+export type ModelHealthNumeric = 0 | 1 | 2; // 0=Healthy, 1=Degraded, 2=Down
+
+export interface HealthModelEntry {
+  id: string;
+  name: string;
+  health: ModelHealthNumeric;
+}
+
+export interface HealthConfig {
+  snapshot_revision: number;
+  snapshot_age_seconds: number;
+}
 
 export interface HealthStatus {
-  status: HealthState;
-  version?: string;
-  uptime_seconds?: number;
-  checks?: Record<string, { status: HealthState; message?: string }>;
+  status: 'ok' | 'degraded' | 'unhealthy';
+  models: HealthModelEntry[];
+  config: HealthConfig;
 }
 
 export interface ModelStatusEntry {
   id: string;
-  display_name?: string;
-  provider: string;
-  status: 'active' | 'error' | 'rate_limited' | 'unknown';
-  last_used_at?: string;
-  request_count_1h?: number;
-  error_rate_1h?: number;
+  display_name: string;
+  kind: 'direct' | 'routing' | 'ensemble' | 'semantic';
+  status: 'active' | 'error' | 'rate_limited' | 'not_applicable' | 'unknown';
+  consecutive_failures: number;
+  last_failure: number | null;
+  last_success: number | null;
+}
+
+export interface ProviderBreakdown {
+  requests: number;
+  tokens: number;
 }
 
 export interface MetricsSummary {
-  total_requests_1h: number;
-  total_tokens_1h?: number;
-  avg_latency_ms?: number;
-  p99_latency_ms?: number;
-  error_rate?: number;
-  active_models?: number;
-  provider_breakdown?: Record<string, { requests: number; tokens?: number }>;
+  total_requests: number;
+  total_tokens: number;
+  avg_latency_ms: number;
+  provider_breakdown: Record<string, ProviderBreakdown>;
 }
 
 export interface DashboardData {

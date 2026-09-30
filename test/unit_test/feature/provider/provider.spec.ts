@@ -63,6 +63,7 @@ describe('provider DI modules', () => {
   it('resolves a working ViewModel graph with a bound HttpClient', async () => {
     const httpClient: HttpClient = {
       get: vi.fn().mockResolvedValue({ status: 200, data: [dto], headers: new Headers() }),
+      getText: vi.fn().mockResolvedValue({ status: 200, data: '', headers: new Headers() }),
       post: vi.fn(),
       put: vi.fn(),
       delete: vi.fn(),

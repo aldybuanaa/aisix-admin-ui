@@ -7,11 +7,86 @@ import type { HttpClient } from '@/core/network/HttpClient';
 import type { Result } from '@/core/types';
 import { CoreModuleKeys } from '@/core/di/keys';
 import type { MetricsRemoteDataSource } from '../MetricsRemoteDataSource';
+import { parsePrometheusText } from '../../../../domain/utils/parsePrometheusText';
 import type {
   HealthStatus,
   MetricsSummary,
   ModelStatusEntry,
 } from '../../../../domain/entities/MetricsEntity';
+
+// GET /admin/v1/health returns:
+//   { status: "ok"|"degraded"|"unhealthy", models: [...], config: {...} }
+interface HealthResponseDto {
+  status?: string;
+  models?: unknown;
+  config?: unknown;
+}
+
+// GET /admin/v1/models/status returns an array of model entries in snake_case.
+interface ModelStatusDto {
+  id?: unknown;
+  display_name?: unknown;
+  kind?: unknown;
+  status?: unknown;
+  consecutive_failures?: unknown;
+  last_failure?: unknown;
+  last_success?: unknown;
+}
+
+const VALID_HEALTH_STATUSES = ['ok', 'degraded', 'unhealthy'] as const;
+const VALID_MODEL_KINDS = ['direct', 'routing', 'ensemble', 'semantic'] as const;
+const VALID_MODEL_STATUSES = ['active', 'error', 'rate_limited', 'not_applicable', 'unknown'] as const;
+
+function mapHealth(body: HealthResponseDto): HealthStatus {
+  const status = VALID_HEALTH_STATUSES.includes(body.status as (typeof VALID_HEALTH_STATUSES)[number])
+    ? (body.status as HealthStatus['status'])
+    : 'unhealthy';
+
+  const models: HealthStatus['models'] = Array.isArray(body.models)
+    ? (body.models as Record<string, unknown>[])
+        .filter((entry) => entry !== null && typeof entry === 'object')
+        .map((entry) => {
+          const record = entry as Record<string, unknown>;
+          const health =
+            typeof record.health === 'number' && (record.health === 0 || record.health === 1 || record.health === 2)
+              ? record.health
+              : 2;
+          return {
+            id: typeof record.id === 'string' ? record.id : '',
+            name: typeof record.name === 'string' ? record.name : '',
+            health,
+          };
+        })
+    : [];
+
+  const configRecord = (body.config ?? {}) as Record<string, unknown>;
+  return {
+    status,
+    models,
+    config: {
+      snapshot_revision: typeof configRecord.snapshot_revision === 'number' ? configRecord.snapshot_revision : 0,
+      snapshot_age_seconds: typeof configRecord.snapshot_age_seconds === 'number' ? configRecord.snapshot_age_seconds : 0,
+    },
+  };
+}
+
+function mapModelStatus(dto: ModelStatusDto): ModelStatusEntry {
+  const kind = VALID_MODEL_KINDS.includes(dto.kind as (typeof VALID_MODEL_KINDS)[number])
+    ? (dto.kind as ModelStatusEntry['kind'])
+    : 'direct';
+  const status = VALID_MODEL_STATUSES.includes(dto.status as (typeof VALID_MODEL_STATUSES)[number])
+    ? (dto.status as ModelStatusEntry['status'])
+    : 'unknown';
+  return {
+    id: typeof dto.id === 'string' ? dto.id : '',
+    display_name: typeof dto.display_name === 'string' ? dto.display_name : '',
+    kind,
+    status,
+    consecutive_failures: typeof dto.consecutive_failures === 'number' ? dto.consecutive_failures : 0,
+    last_failure: typeof dto.last_failure === 'number' ? dto.last_failure : null,
+    last_success: typeof dto.last_success === 'number' ? dto.last_success : null,
+  };
+}
 
 @injectable()
 export class MetricsRemoteDataSourceImpl implements MetricsRemoteDataSource {
@@ -22,11 +97,8 @@ export class MetricsRemoteDataSourceImpl implements MetricsRemoteDataSource {
 
   getHealth(): Observable<Result<HealthStatus, string>> {
     return toResultObservable(
-      safeRequest<HealthStatus, { message: string | null }>(() => this.http.get('/admin/v1/health')),
-      (body) => {
-        if (body && typeof body === 'object' && 'status' in body) return body;
-        return { status: 'ok' } as HealthStatus;
-      },
+      safeRequest<HealthResponseDto, { message: string | null }>(() => this.http.get('/admin/v1/health')),
+      mapHealth,
       'Failed to fetch health status',
     );
   }
@@ -35,25 +107,10 @@ export class MetricsRemoteDataSourceImpl implements MetricsRemoteDataSource {
     return toResultObservable(
       safeRequest<unknown, { message: string | null }>(() => this.http.get('/admin/v1/models/status')),
       (raw): ModelStatusEntry[] => {
-        if (Array.isArray(raw)) return raw as ModelStatusEntry[];
-        if (raw && typeof raw === 'object') {
-          return Object.entries(raw as Record<string, unknown>).map(([id, val]) => {
-            if (typeof val === 'object' && val !== null) {
-              const v = val as Record<string, unknown>;
-              return {
-                id,
-                provider: typeof v.provider === 'string' ? v.provider : 'unknown',
-                status: typeof v.status === 'string' ? (v.status as ModelStatusEntry['status']) : 'active',
-                display_name: typeof v.display_name === 'string' ? v.display_name : undefined,
-                last_used_at: typeof v.last_used_at === 'string' ? v.last_used_at : undefined,
-                request_count_1h: typeof v.request_count_1h === 'number' ? v.request_count_1h : undefined,
-                error_rate_1h: typeof v.error_rate_1h === 'number' ? v.error_rate_1h : undefined,
-              };
-            }
-            return { id, provider: 'unknown', status: 'active' as const };
-          });
-        }
-        return [];
+        if (!Array.isArray(raw)) return [];
+        return raw
+          .filter((entry): entry is ModelStatusDto => entry !== null && typeof entry === 'object')
+          .map(mapModelStatus);
       },
       'Failed to fetch model statuses',
     );
@@ -61,13 +118,8 @@ export class MetricsRemoteDataSourceImpl implements MetricsRemoteDataSource {
 
   getMetricsSummary(): Observable<Result<MetricsSummary, string>> {
     return toResultObservable(
-      safeRequest<MetricsSummary, { message: string | null }>(() =>
-        this.http.get('/admin/v1/metrics/summary'),
-      ),
-      (body) => {
-        if (body && typeof body === 'object') return body;
-        return { total_requests_1h: 0 };
-      },
+      safeRequest<string, { message: string | null }>(() => this.http.getText('/admin/v1/metrics')),
+      (text) => parsePrometheusText(typeof text === 'string' ? text : ''),
       'Failed to fetch metrics summary',
     );
   }

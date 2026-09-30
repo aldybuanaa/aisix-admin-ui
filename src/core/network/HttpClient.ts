@@ -24,10 +24,12 @@ export type HttpRequestOptions = {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
   signal?: AbortSignal;
+  responseType?: 'json' | 'text';
 };
 
 export interface HttpClient {
   get<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
+  getText(path: string, options?: HttpRequestOptions): Promise<HttpResponse<string>>;
   post<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
   put<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
   delete<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>>;
@@ -42,6 +44,17 @@ export class FetchHttpClient implements HttpClient {
 
   get<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
     return this.request<T>('GET', path, options);
+  }
+
+  getText(path: string, options?: HttpRequestOptions): Promise<HttpResponse<string>> {
+    return this.request<string>('GET', path, {
+      ...options,
+      headers: {
+        Accept: 'text/plain',
+        ...options?.headers,
+      },
+      responseType: 'text',
+    });
   }
 
   post<T>(path: string, options?: HttpRequestOptions): Promise<HttpResponse<T>> {
@@ -84,7 +97,12 @@ export class FetchHttpClient implements HttpClient {
       throw error instanceof Error ? error : new Error(String(error));
     }
 
-    const data = (await response.json().catch(() => null)) as T;
+    let data: T;
+    if (options?.responseType === 'text') {
+      data = (await response.text().catch(() => '')) as unknown as T;
+    } else {
+      data = (await response.json().catch(() => null)) as T;
+    }
     if (!response.ok) {
       throw new HttpError(response.status, data);
     }

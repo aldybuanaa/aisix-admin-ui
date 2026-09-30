@@ -37,11 +37,25 @@ function healthDot(status: string) {
   return 'bg-red-500';
 }
 
+// 0=Healthy, 1=Degraded, 2=Down
+function modelHealthLabel(health: 0 | 1 | 2): string {
+  if (health === 0) return 'Healthy';
+  if (health === 1) return 'Degraded';
+  return 'Down';
+}
+
+function modelHealthBadgeClass(health: 0 | 1 | 2): string {
+  if (health === 0) return 'badge-emerald';
+  if (health === 1) return 'badge-amber';
+  return 'badge-red';
+}
+
 function statusBadgeClass(status: ModelStatusEntry['status']) {
   switch (status) {
     case 'active': return 'badge-emerald';
     case 'error': return 'badge-red';
     case 'rate_limited': return 'badge-amber';
+    case 'not_applicable': return 'badge';
     default: return 'badge';
   }
 }
@@ -50,7 +64,7 @@ function fmtNum(n: number | undefined): string {
   if (n === undefined || n === null) return '—';
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k';
-  return String(n);
+  return String(Math.round(n));
 }
 
 function fmtMs(n: number | undefined): string {
@@ -58,9 +72,9 @@ function fmtMs(n: number | undefined): string {
   return n.toFixed(0) + ' ms';
 }
 
-function fmtPct(n: number | undefined): string {
-  if (n === undefined || n === null) return '—';
-  return (n * 100).toFixed(1) + '%';
+function fmtTimestamp(ts: number | null): string {
+  if (ts === null) return '—';
+  return new Date(ts * 1000).toLocaleString();
 }
 </script>
 
@@ -105,25 +119,19 @@ function fmtPct(n: number | undefined): string {
         <div v-else class="text-sm text-slate-400">—</div>
 
         <div
-          v-if="health.type === 'Success' && health.data.uptime_seconds !== undefined"
+          v-if="health.type === 'Success' && health.data.config"
           class="text-xs text-slate-500 dark:text-slate-400"
         >
-          Uptime: {{ (health.data.uptime_seconds / 3600).toFixed(1) }}h
-        </div>
-        <div
-          v-if="health.type === 'Success' && health.data.version"
-          class="text-xs font-mono text-slate-400 dark:text-slate-500"
-        >
-          v{{ health.data.version }}
+          Config rev: {{ health.data.config.snapshot_revision }}
         </div>
       </div>
 
-      <!-- Total Requests 1h -->
+      <!-- Total Requests -->
       <div class="panel p-4 space-y-2" aria-label="Total requests">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Requests (1h)</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Requests</div>
         <div v-if="metrics.type === 'Loading'" class="text-sm text-slate-500 animate-pulse">Loading…</div>
         <div v-else-if="metrics.type === 'Success'" class="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-          {{ fmtNum(metrics.data.total_requests_1h) }}
+          {{ fmtNum(metrics.data.total_requests) }}
         </div>
         <div v-else-if="metrics.type === 'Error'" class="text-xs text-red-500" role="alert">{{ metrics.message }}</div>
         <div v-else class="text-2xl font-bold text-slate-400">—</div>
@@ -133,55 +141,46 @@ function fmtPct(n: number | undefined): string {
       <div class="panel p-4 space-y-2" aria-label="Average latency">
         <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Avg Latency</div>
         <div v-if="metrics.type === 'Loading'" class="text-sm text-slate-500 animate-pulse">Loading…</div>
-        <div v-else-if="metrics.type === 'Success'" class="text-2xl font-bold tabular-nums"
-          :class="(metrics.data.avg_latency_ms ?? 0) > 2000 ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'"
+        <div
+          v-else-if="metrics.type === 'Success'"
+          class="text-2xl font-bold tabular-nums"
+          :class="metrics.data.avg_latency_ms > 2000 ? 'text-amber-600' : 'text-slate-900 dark:text-slate-100'"
         >
           {{ fmtMs(metrics.data.avg_latency_ms) }}
         </div>
         <div v-else class="text-2xl font-bold text-slate-400">—</div>
-        <div v-if="metrics.type === 'Success' && metrics.data.p99_latency_ms !== undefined" class="text-xs text-slate-500">
-          p99: {{ fmtMs(metrics.data.p99_latency_ms) }}
-        </div>
       </div>
 
-      <!-- Error Rate -->
-      <div class="panel p-4 space-y-2" aria-label="Error rate">
-        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Error Rate</div>
+      <!-- Total Tokens -->
+      <div class="panel p-4 space-y-2" aria-label="Total tokens">
+        <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Tokens</div>
         <div v-if="metrics.type === 'Loading'" class="text-sm text-slate-500 animate-pulse">Loading…</div>
-        <div v-else-if="metrics.type === 'Success'" class="text-2xl font-bold tabular-nums"
-          :class="(metrics.data.error_rate ?? 0) > 0.05 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'"
-        >
-          {{ fmtPct(metrics.data.error_rate) }}
+        <div v-else-if="metrics.type === 'Success'" class="text-2xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+          {{ fmtNum(metrics.data.total_tokens) }}
         </div>
         <div v-else class="text-2xl font-bold text-slate-400">—</div>
       </div>
     </div>
 
-    <!-- Health Checks detail -->
+    <!-- Model Health (from /admin/v1/health models array) -->
     <div
-      v-if="health.type === 'Success' && health.data.checks && Object.keys(health.data.checks).length > 0"
+      v-if="health.type === 'Success' && health.data.models.length > 0"
       class="panel p-4 space-y-3"
     >
-      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Health Checks</h3>
+      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Model Health</h3>
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
         <div
-          v-for="(check, name) in health.data.checks"
-          :key="name"
+          v-for="model in health.data.models"
+          :key="model.id"
           class="flex items-center justify-between p-2.5 rounded-md bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-800 text-sm"
         >
-          <span class="font-mono text-xs text-slate-700 dark:text-slate-300">{{ name }}</span>
-          <div class="flex items-center gap-1.5">
-            <span
-              :class="['w-2 h-2 rounded-full flex-shrink-0', healthDot(check.status)]"
-              :aria-label="check.status"
-            ></span>
-            <span class="text-xs" :class="healthColor(check.status)">{{ check.status }}</span>
-          </div>
+          <span class="font-mono text-xs text-slate-700 dark:text-slate-300 truncate max-w-[140px]">{{ model.name }}</span>
+          <span :class="['badge', modelHealthBadgeClass(model.health)]">{{ modelHealthLabel(model.health) }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Model Statuses -->
+    <!-- Model Statuses (from /admin/v1/models/status) -->
     <div class="panel p-4 space-y-3">
       <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Model Status</h3>
 
@@ -209,11 +208,10 @@ function fmtPct(n: number | undefined): string {
           <thead>
             <tr class="text-[11px] uppercase tracking-wider text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
               <th class="pb-2 font-semibold">Model</th>
-              <th class="pb-2 font-semibold hidden sm:table-cell">Provider</th>
+              <th class="pb-2 font-semibold hidden sm:table-cell">Kind</th>
               <th class="pb-2 font-semibold">Status</th>
-              <th class="pb-2 font-semibold hidden md:table-cell text-right">Reqs/h</th>
-              <th class="pb-2 font-semibold hidden md:table-cell text-right">Err Rate</th>
-              <th class="pb-2 font-semibold hidden lg:table-cell">Last Used</th>
+              <th class="pb-2 font-semibold hidden md:table-cell text-right">Failures</th>
+              <th class="pb-2 font-semibold hidden lg:table-cell">Last Success</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -223,23 +221,20 @@ function fmtPct(n: number | undefined): string {
               class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
             >
               <td class="py-2.5 pr-3">
-                <div class="font-mono text-xs text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{{ m.id }}</div>
-                <div v-if="m.display_name" class="text-[11px] text-slate-400 truncate">{{ m.display_name }}</div>
+                <div class="font-mono text-xs text-slate-800 dark:text-slate-200 truncate max-w-[180px]">{{ m.display_name }}</div>
+                <div class="text-[11px] text-slate-400 truncate">{{ m.id }}</div>
               </td>
-              <td class="py-2.5 pr-3 hidden sm:table-cell text-xs text-slate-600 dark:text-slate-400">{{ m.provider }}</td>
+              <td class="py-2.5 pr-3 hidden sm:table-cell text-xs text-slate-600 dark:text-slate-400">{{ m.kind }}</td>
               <td class="py-2.5 pr-3">
                 <span :class="['badge', statusBadgeClass(m.status)]">{{ m.status }}</span>
               </td>
-              <td class="py-2.5 pr-3 hidden md:table-cell text-right text-xs tabular-nums text-slate-700 dark:text-slate-300">
-                {{ fmtNum(m.request_count_1h) }}
-              </td>
               <td class="py-2.5 pr-3 hidden md:table-cell text-right text-xs tabular-nums"
-                :class="(m.error_rate_1h ?? 0) > 0.05 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'"
+                :class="m.consecutive_failures > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'"
               >
-                {{ fmtPct(m.error_rate_1h) }}
+                {{ m.consecutive_failures }}
               </td>
               <td class="py-2.5 hidden lg:table-cell text-xs text-slate-400 font-mono">
-                {{ m.last_used_at ? new Date(m.last_used_at).toLocaleString() : '—' }}
+                {{ fmtTimestamp(m.last_success) }}
               </td>
             </tr>
           </tbody>
@@ -251,10 +246,10 @@ function fmtPct(n: number | undefined): string {
 
     <!-- Provider Breakdown -->
     <div
-      v-if="metrics.type === 'Success' && metrics.data.provider_breakdown && Object.keys(metrics.data.provider_breakdown).length > 0"
+      v-if="metrics.type === 'Success' && Object.keys(metrics.data.provider_breakdown).length > 0"
       class="panel p-4 space-y-3"
     >
-      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Provider Breakdown (1h)</h3>
+      <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-200">Provider Breakdown</h3>
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         <div
           v-for="(breakdown, provider) in metrics.data.provider_breakdown"
@@ -263,7 +258,7 @@ function fmtPct(n: number | undefined): string {
         >
           <div class="font-semibold text-slate-700 dark:text-slate-200 truncate">{{ provider }}</div>
           <div class="tabular-nums text-slate-600 dark:text-slate-400">Requests: <strong>{{ fmtNum(breakdown.requests) }}</strong></div>
-          <div v-if="breakdown.tokens !== undefined" class="tabular-nums text-slate-500">
+          <div class="tabular-nums text-slate-500">
             Tokens: {{ fmtNum(breakdown.tokens) }}
           </div>
         </div>
