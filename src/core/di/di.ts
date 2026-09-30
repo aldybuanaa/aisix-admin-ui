@@ -4,6 +4,9 @@ import { CoreModuleKeys } from './keys';
 import type { HttpClient } from '@/core/network/HttpClient';
 import { FetchHttpClient } from '@/core/network/HttpClient';
 import { registerAdminModules } from '@/feature/admin/di/AdminModules';
+import { registerWizardModules } from '@/feature/wizard/di/WizardModules';
+import { registerRoutingModules } from '@/feature/routing/di/RoutingModules';
+import { registerMetricsModules } from '@/feature/metrics/di/MetricsModules';
 
 export const coreContainer = new Container();
 
@@ -17,3 +20,6 @@ coreContainer
 
 // Register feature modules
 registerAdminModules(coreContainer);
+registerWizardModules(coreContainer);
+registerRoutingModules(coreContainer);
+registerMetricsModules(coreContainer);
