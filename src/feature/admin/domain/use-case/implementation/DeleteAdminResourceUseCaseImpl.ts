@@ -34,7 +34,7 @@ export class DeleteAdminResourceUseCaseImpl implements DeleteAdminResourceUseCas
       case 'passthrough_routes':
         return this.repository.deletePassthroughRoute(id);
       case 'observability_exporters':
-        return of(ResultFactory.Failure('Observability exporter tidak dapat dihapus'));
+        return this.repository.deleteObservabilityExporter(id);
       default:
         return of(ResultFactory.Failure(`Tipe resource tidak valid: ${String(resourceKey)}`));
     }

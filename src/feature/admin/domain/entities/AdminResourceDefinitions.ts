@@ -105,14 +105,14 @@ const definitions: Record<AdminResourceKey, AdminResourceDefinition> = {
   },
   observability_exporters: {
     key: 'observability_exporters', titleKey: 'resources.observability_exporters', singularKey: 'resource.observability_exporter',
-    descriptionKey: 'descriptions.observability_exporters', writable: false,
+    descriptionKey: 'descriptions.observability_exporters', writable: true,
     columns: [
       { key: 'name', labelKey: 'columns.name', alwaysVisible: true },
       { key: 'kind', labelKey: 'columns.kind' },
       { key: 'enabled', labelKey: 'columns.status' },
       { key: 'revision', labelKey: 'columns.revision' },
     ],
-    initialPayload: {},
+    initialPayload: { name: '', kind: 'otlp', enabled: true },
     secretField: null,
   },
 };

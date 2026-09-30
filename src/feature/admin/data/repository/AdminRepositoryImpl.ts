@@ -206,10 +206,19 @@ export class AdminRepositoryImpl implements AdminRepository {
   // ─── Observability Exporters ──────────────────────────────────────────────
 
   listObservabilityExporters(): Observable<Result<ObservabilityExporter[], string>> {
-    return toResultObservable(this.ds.listObservabilityExporters(), (d) => d.map(mapObservabilityExporterDtoToDomain), 'Gagal memuat observability exporters');
+    return toResultObservable(this.ds.listObservabilityExporters(), (d) => d.map(mapObservabilityExporterDtoToDomain), 'Failed to load observability exporters');
   }
   getObservabilityExporter(id: string): Observable<Result<ObservabilityExporter, string>> {
-    return toResultObservable(this.ds.getObservabilityExporter(id), mapObservabilityExporterDtoToDomain, 'Gagal memuat observability exporter');
+    return toResultObservable(this.ds.getObservabilityExporter(id), mapObservabilityExporterDtoToDomain, 'Failed to load observability exporter');
+  }
+  createObservabilityExporter(body: Record<string, unknown>): Observable<Result<ObservabilityExporter, string>> {
+    return toResultObservable(this.ds.createObservabilityExporter(body), mapObservabilityExporterDtoToDomain, 'Failed to create observability exporter');
+  }
+  updateObservabilityExporter(id: string, body: Record<string, unknown>): Observable<Result<ObservabilityExporter, string>> {
+    return toResultObservable(this.ds.updateObservabilityExporter(id, body), mapObservabilityExporterDtoToDomain, 'Failed to update observability exporter');
+  }
+  deleteObservabilityExporter(id: string): Observable<Result<void, string>> {
+    return toResultObservable(this.ds.deleteObservabilityExporter(id), () => undefined, 'Failed to delete observability exporter');
   }
 
   // ─── Model Discovery ──────────────────────────────────────────────────────

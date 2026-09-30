@@ -60,9 +60,12 @@ export interface AdminRepository {
   createPassthroughRoute(body: Record<string, unknown>): Observable<Result<PassthroughRoute, string>>;
   updatePassthroughRoute(id: string, body: Record<string, unknown>): Observable<Result<PassthroughRoute, string>>;
   deletePassthroughRoute(id: string): Observable<Result<void, string>>;
-  // Observability exporters (GET-only)
+  // Observability exporters (Writable - backend supports PUT/POST/DELETE)
   listObservabilityExporters(): Observable<Result<ObservabilityExporter[], string>>;
   getObservabilityExporter(id: string): Observable<Result<ObservabilityExporter, string>>;
+  createObservabilityExporter(body: Record<string, unknown>): Observable<Result<ObservabilityExporter, string>>;
+  updateObservabilityExporter(id: string, body: Record<string, unknown>): Observable<Result<ObservabilityExporter, string>>;
+  deleteObservabilityExporter(id: string): Observable<Result<void, string>>;
   // Model discovery
   discoverModels(
     adapter: DiscoverAdapter,

@@ -56,7 +56,9 @@ export class SaveAdminResourceUseCaseImpl implements SaveAdminResourceUseCase {
           ? this.repository.updatePassthroughRoute(id, payload)
           : this.repository.createPassthroughRoute(payload)) as Observable<Result<AdminResource, string>>;
       case 'observability_exporters':
-        return of(ResultFactory.Failure('Observability exporter bersifat read-only'));
+        return (isUpdate
+          ? this.repository.updateObservabilityExporter(id, payload)
+          : this.repository.createObservabilityExporter(payload)) as Observable<Result<AdminResource, string>>;
       default:
         return of(ResultFactory.Failure(`Tipe resource tidak valid: ${String(resourceKey)}`));
     }

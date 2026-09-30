@@ -162,6 +162,15 @@ export class AdminRemoteDataSourceImpl implements AdminRemoteDataSource {
   getObservabilityExporter(id: string): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>> {
     return safeRequest(() => this.httpClient.get<ResourceEntryDto<ObservabilityExporterDto>>(`/admin/v1/observability_exporters/${encodeURIComponent(id)}`));
   }
+  createObservabilityExporter(body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>> {
+    return safeRequest(() => this.httpClient.post<ResourceEntryDto<ObservabilityExporterDto>>('/admin/v1/observability_exporters', { body }));
+  }
+  updateObservabilityExporter(id: string, body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>> {
+    return safeRequest(() => this.httpClient.put<ResourceEntryDto<ObservabilityExporterDto>>(`/admin/v1/observability_exporters/${encodeURIComponent(id)}`, { body }));
+  }
+  deleteObservabilityExporter(id: string): Promise<ApiResult<DeleteResponse, ErrorResponse>> {
+    return safeRequest(() => this.httpClient.delete<DeleteResponse>(`/admin/v1/observability_exporters/${encodeURIComponent(id)}`));
+  }
 
   discoverModels(body: DiscoverModelsRequestDto): Promise<ApiResult<DiscoverModelsResponseDto, ErrorResponse>> {
     return safeRequest(() => this.httpClient.post<DiscoverModelsResponseDto>('/admin/v1/models/discover', { body }));

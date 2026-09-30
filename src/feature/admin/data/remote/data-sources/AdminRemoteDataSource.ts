@@ -63,9 +63,12 @@ export interface AdminRemoteDataSource {
   createPassthroughRoute(body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<PassthroughRouteDto>, ErrorResponse>>;
   updatePassthroughRoute(id: string, body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<PassthroughRouteDto>, ErrorResponse>>;
   deletePassthroughRoute(id: string): Promise<ApiResult<{ deleted: boolean; id: string }, ErrorResponse>>;
-  // Observability exporters (GET-only on backend)
+  // Observability exporters (Writable)
   listObservabilityExporters(): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>[], ErrorResponse>>;
   getObservabilityExporter(id: string): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>>;
+  createObservabilityExporter(body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>>;
+  updateObservabilityExporter(id: string, body: Record<string, unknown>): Promise<ApiResult<ResourceEntryDto<ObservabilityExporterDto>, ErrorResponse>>;
+  deleteObservabilityExporter(id: string): Promise<ApiResult<{ deleted: boolean; id: string }, ErrorResponse>>;
   // Model auto-discovery (SSRF-safe on backend)
   discoverModels(body: DiscoverModelsRequestDto): Promise<ApiResult<DiscoverModelsResponseDto, ErrorResponse>>;
 }
